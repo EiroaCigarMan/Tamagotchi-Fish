@@ -6,7 +6,7 @@ export const clamp = (v: number, lo = 0, hi = 100) => Math.min(hi, Math.max(lo, 
 export function defaultState(now = Date.now()): GameState {
   return {
     schemaVersion: 1,
-    hunger: 80,
+    hunger: 81,
     happiness: 75,
     cleanliness: 85,
     lastSeenAt: now,
