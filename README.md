@@ -63,3 +63,4 @@ src/
 ## Verify offline decay yourself
 
 Open DevTools → Application → Local Storage → `tamagotchi-fish:v1`, set `lastSeenAt` to a timestamp a day ago, reload.
+
