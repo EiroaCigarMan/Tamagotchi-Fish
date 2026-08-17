@@ -2,8 +2,8 @@ import { useState } from "react";
 import { formatClock } from "../game/time";
 import type { TimeFormat } from "../game/types";
 
-export function SettingsPanel({ timeFormat, now, onTimeFormat, onReset }: {
-  timeFormat: TimeFormat; now: number; onTimeFormat: (f: TimeFormat) => void; onReset: () => void;
+export function SettingsPanel({ timeFormat, now, onTimeFormat, onReset, onRename }: {
+  timeFormat: TimeFormat; now: number; onTimeFormat: (f: TimeFormat) => void; onReset: () => void; onRename: () => void;
 }) {
   const [confirming, setConfirming] = useState(false);
   const clock = formatClock(new Date(now), timeFormat);
@@ -21,6 +21,10 @@ export function SettingsPanel({ timeFormat, now, onTimeFormat, onReset }: {
       <div className="row muted">
         <span>Now</span>
         <span className="mono">{clock.display}{clock.meridiem ? ` ${clock.meridiem}` : ""}</span>
+      </div>
+      <div className="row">
+        <span>Fish name</span>
+        <button className="seg-btn" onClick={onRename}>Rename…</button>
       </div>
       <div className="row">
         {confirming ? (

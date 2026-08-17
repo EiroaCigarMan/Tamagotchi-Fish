@@ -21,7 +21,7 @@ function coerce(raw: unknown, now: number): GameState | null {
     lastSeenAt: num(raw.lastSeenAt, now),
     lastActionAt: { feed: ts(la.feed), play: ts(la.play), clean: ts(la.clean) },
     timeFormat: raw.timeFormat === "24h" ? "24h" : "12h",
-    fishName: typeof raw.fishName === "string" && raw.fishName.trim() ? raw.fishName.slice(0, 20) : d.fishName,
+    fishName: typeof raw.fishName === "string" ? raw.fishName.trim().slice(0, 16) : "",
     createdAt: num(raw.createdAt, now),
   };
 }

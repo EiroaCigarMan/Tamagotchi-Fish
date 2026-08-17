@@ -12,7 +12,7 @@ export function defaultState(now = Date.now()): GameState {
     lastSeenAt: now,
     lastActionAt: { feed: null, play: null, clean: null },
     timeFormat: "12h",
-    fishName: "Goldie",
+    fishName: "",
     createdAt: now,
   };
 }
@@ -49,4 +49,10 @@ export function applyAction(state: GameState, action: ActionName, now: number): 
 
 export function setTimeFormat(state: GameState, timeFormat: TimeFormat): GameState {
   return { ...state, timeFormat };
+}
+
+export const MAX_NAME_LEN = 16;
+export function setFishName(state: GameState, name: string): GameState {
+  const clean = name.replace(/\s+/g, " ").trim().slice(0, MAX_NAME_LEN);
+  return clean ? { ...state, fishName: clean } : state;
 }

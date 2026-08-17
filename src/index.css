@@ -62,3 +62,10 @@ body {
 .seg-btn { font: inherit; font-size: 8px; padding: 6px 8px; color: var(--text); background: #2b2547; border: 2px solid var(--panel-edge); cursor: pointer; border-radius: 3px; }
 .seg-btn.on { background: var(--accent); color: #1c1730; border-color: var(--accent); }
 .seg-btn.danger { background: var(--low); border-color: var(--low); color: #fff; }
+
+.modal-backdrop { position: fixed; inset: 0; background: rgba(8,6,20,0.75); display: grid; place-items: center; padding: 16px; z-index: 10; }
+.modal { width: min(420px, 100%); }
+.field { display: grid; gap: 8px; font-size: 9px; margin-bottom: 8px; }
+.input { font: inherit; font-size: 11px; color: var(--text); background: #0b0a14; border: 3px solid var(--panel-edge); padding: 10px; border-radius: 3px; width: 100%; }
+.input:focus { outline: none; border-color: var(--accent); }
+.hint { font-size: 8px; color: var(--muted); margin: 0 0 12px; }

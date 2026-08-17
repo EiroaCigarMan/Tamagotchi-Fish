@@ -14,7 +14,7 @@ export function StatsPanel({ state, mood }: { state: GameState; mood: FishMood }
   return (
     <section className="panel" aria-labelledby="stats-h">
       <h2 id="stats-h" className="panel-title">
-        {state.fishName} <span className="mood" title={MOOD_LABEL[mood]}>{MOOD_FACE[mood]} {MOOD_LABEL[mood]}</span>
+        {state.fishName || "…"} <span className="mood" title={MOOD_LABEL[mood]}>{MOOD_FACE[mood]} {MOOD_LABEL[mood]}</span>
       </h2>
       <ul className="stats">
         {STATS.map(({ key, label, icon }) => {

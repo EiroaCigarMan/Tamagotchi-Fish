@@ -95,7 +95,7 @@ export class FishEngine {
   start() {
     this.last = performance.now();
     const loop = (now: number) => {
-      const dt = Math.min(0.1, (now - this.last) / 1000);
+      const dt = Math.max(0, Math.min(0.1, (now - this.last) / 1000));
       this.last = now;
       this.t += dt;
       this.update(dt);
@@ -275,8 +275,8 @@ export class FishEngine {
     for (const g of this.gravel) { ctx.fillStyle = g.c; ctx.fillRect(g.x, g.y, 1, 1); }
 
     // plants (behind)
-    this.plant(30, BOWL.sandY, 22, "#2f8f4f", "#5cc47a", 0);
-    this.plant(128, BOWL.sandY, 26, "#2a7a45", "#4fb56b", 1.3);
+    this.plant(45, BOWL.sandY, 22, "#2f8f4f", "#5cc47a", 0);
+    this.plant(114, BOWL.sandY, 24, "#2a7a45", "#4fb56b", 1.3);
 
     // fish behind castle
     if (this.fish.layer === "behind") this.drawFish();
@@ -296,7 +296,7 @@ export class FishEngine {
       else { ctx.fillRect(x, y - 1, 1, 1); ctx.fillRect(x - 1, y, 1, 1); ctx.fillRect(x + 1, y, 1, 1); ctx.fillRect(x, y + 1, 1, 1); ctx.fillStyle = "#ffffff"; ctx.fillRect(x - 1, y - 1, 1, 1); }
     }
     // front plant
-    this.plant(112, BOWL.sandY + 2, 14, "#3a9c58", "#7ee39a", 2.1);
+    this.plant(104, BOWL.sandY + 3, 12, "#3a9c58", "#7ee39a", 2.1);
 
     // dirt specks (only when quite dirty)
     if (dirt > 0.6) {
@@ -321,21 +321,30 @@ export class FishEngine {
     for (let y = BOWL.rimY + 44; y < BOWL.rimY + 60; y++) { const hw = halfW(y); ctx.fillRect(BOWL.cx - hw + 5, y, 1, 1); }
   }
 
+  /** Draw a 1px-wide run clipped to the inside of the glass on row y. */
+  private waterRect(x: number, y: number, w: number, c: string) {
+    const hw = halfW(y) - 3;
+    if (hw <= 0) return;
+    const x0 = Math.max(x, BOWL.cx - hw), x1 = Math.min(x + w, BOWL.cx + hw + 1);
+    if (x1 <= x0) return;
+    this.ctx.fillStyle = c;
+    this.ctx.fillRect(x0, y, x1 - x0, 1);
+  }
+
   private plant(x: number, baseY: number, h: number, dark: string, light: string, phase: number) {
-    const ctx = this.ctx;
     for (let i = 0; i < h; i++) {
       const y = baseY - i;
       const sway = Math.round(Math.sin(this.t * 1.5 + phase + i * 0.25) * (i / h) * 2);
-      ctx.fillStyle = i % 5 === 4 ? light : dark;
-      ctx.fillRect(x + sway, y, 2, 1);
-      if (i % 4 === 1 && i > 3) { ctx.fillStyle = light; ctx.fillRect(x + sway - 2, y, 2, 1); }
-      if (i % 4 === 3 && i > 3) { ctx.fillStyle = light; ctx.fillRect(x + sway + 2, y, 2, 1); }
+      this.waterRect(x + sway, y, 2, i % 5 === 4 ? light : dark);
+      if (i % 4 === 1 && i > 3) this.waterRect(x + sway - 2, y, 2, light);
+      if (i % 4 === 3 && i > 3) this.waterRect(x + sway + 2, y, 2, light);
     }
   }
 
   private drawFish() {
     const f = this.fish;
-    const frame = FISH_FRAMES[Math.floor(f.frameT) % FISH_FRAMES.length];
+    const n = FISH_FRAMES.length;
+    const frame = FISH_FRAMES[((Math.floor(f.frameT) % n) + n) % n];
     const w = spriteWidth(frame), h = spriteHeight(frame);
     const bob = Math.round(Math.sin(f.bob) * 1.5);
     const x = Math.round(f.x - w / 2), y = Math.round(f.y - h / 2) + bob;

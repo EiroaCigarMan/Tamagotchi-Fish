@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DECAY_TICK_MS } from "./constants";
 import { getMood } from "./mood";
-import { applyAction, applyDecay, defaultState, setTimeFormat as setFmt } from "./state";
+import { applyAction, applyDecay, defaultState, setFishName as setName, setTimeFormat as setFmt } from "./state";
 import { clearState, loadState, saveState } from "./storage";
 import type { ActionName, TimeFormat } from "./types";
 
@@ -39,11 +39,12 @@ export function useFishGame() {
   }, []);
 
   const setTimeFormat = useCallback((f: TimeFormat) => setState((s) => setFmt(s, f)), []);
+  const setFishName = useCallback((n: string) => setState((s) => setName(s, n)), []);
   const reset = useCallback(() => {
     clearState();
     setState(defaultState());
   }, []);
 
   const mood = useMemo(() => getMood(state), [state]);
-  return { state, now, mood, act, setTimeFormat, reset };
+  return { state, now, mood, act, setTimeFormat, setFishName, reset };
 }
