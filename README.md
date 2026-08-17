@@ -2,6 +2,8 @@
 
 A cozy, 8-bit goldfish tamagotchi that lives in your browser. Feed it, play with it, keep its bowl clean — and read the time off the little castle it swims around.
 
+<p align="center"><img src="docs/img/goldfish-bowl.png" width="480" alt="Pixel-art goldfish swimming in a round bowl above a castle whose clock reads 5:30"></p>
+
 - Pixel-art scene rendered on a 160×144 `<canvas>` (scaled up crisp), React for the panels.
 - Stats **Full / Happy / Clean** decay in real time — including while the tab is closed (computed from the last-seen timestamp on load).
 - The fish never dies; low stats just change its mood, speed, and the water colour.
