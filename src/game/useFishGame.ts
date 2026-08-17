@@ -1,0 +1,49 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { DECAY_TICK_MS } from "./constants";
+import { getMood } from "./mood";
+import { applyAction, applyDecay, defaultState, setTimeFormat as setFmt } from "./state";
+import { clearState, loadState, saveState } from "./storage";
+import type { ActionName, TimeFormat } from "./types";
+
+export function useFishGame() {
+  const [state, setState] = useState(() => loadState());
+  const [now, setNow] = useState(() => Date.now());
+
+  // Real-time decay tick + a 1s "now" pulse for cooldown displays.
+  useEffect(() => {
+    const decayId = window.setInterval(() => setState((s) => applyDecay(s, Date.now())), DECAY_TICK_MS);
+    const nowId = window.setInterval(() => setNow(Date.now()), 1000);
+    const onVis = () => {
+      if (document.visibilityState === "visible") setState((s) => applyDecay(s, Date.now()));
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      clearInterval(decayId);
+      clearInterval(nowId);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, []);
+
+  useEffect(() => saveState(state), [state]);
+
+  // Ref mirror so `act` can report refusal (cooldown) synchronously without relying on updater timing.
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  const act = useCallback((action: ActionName): boolean => {
+    const cur = stateRef.current;
+    const next = applyAction(cur, action, Date.now());
+    if (next === cur) return false;
+    stateRef.current = next;
+    setState(next);
+    return true;
+  }, []);
+
+  const setTimeFormat = useCallback((f: TimeFormat) => setState((s) => setFmt(s, f)), []);
+  const reset = useCallback(() => {
+    clearState();
+    setState(defaultState());
+  }, []);
+
+  const mood = useMemo(() => getMood(state), [state]);
+  return { state, now, mood, act, setTimeFormat, reset };
+}
