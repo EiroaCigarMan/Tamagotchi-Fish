@@ -10,6 +10,8 @@ A cozy, 8-bit goldfish tamagotchi that lives in your browser. Feed it, play with
 
 ## Run it
 
+**Live:** https://eiroacigarman.github.io/Tamagotchi-Fish/ (auto-deployed from `main` by GitHub Actions → Pages)
+
 Requires Node ≥ 20 **or** Bun. No other setup, no accounts, no backend.
 
 ```bash
