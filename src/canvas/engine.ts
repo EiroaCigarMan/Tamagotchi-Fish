@@ -349,16 +349,15 @@ export class FishEngine {
     const bob = Math.round(Math.sin(f.bob) * 1.5);
     const x = Math.round(f.x - w / 2), y = Math.round(f.y - h / 2) + bob;
     drawSprite(this.ctx, frame, x, y, f.facing === -1, FISH_MOOD_PALETTE[this.inputs.mood]);
-    // mood details drawn over the sprite (eye is at col 9-10,row 4 facing right)
-    const ex = f.facing === 1 ? x + 10 : x + (w - 1 - 10);
-    const ey = y + 4;
+    // mood details drawn over the sprite (eye = white at col 10, pupil at col 11 when facing right; row 4)
+    const col = (c: number) => (f.facing === 1 ? x + c : x + (w - 1 - c));
+    const ex = Math.min(col(10), col(11)), ey = y + 4;
     const mood = this.inputs.mood;
-    this.ctx.fillStyle = "#1a1a2e";
-    if (mood === "sad" || mood === "bored") this.ctx.fillRect(ex, ey - 1, 1, 1); // droopy lid
-    if (mood === "sleepy" && Math.floor(this.t * 0.8) % 3 === 0) this.ctx.fillRect(ex, ey, 1, 1); // blink
+    this.ctx.fillStyle = "#c9641a";
+    if (mood === "sad" || mood === "bored") this.ctx.fillRect(ex, ey - 1, 2, 1); // droopy lid
+    if (mood === "sleepy" && Math.floor(this.t * 0.8) % 3 === 0) this.ctx.fillRect(ex, ey, 2, 1); // blink
     if (mood === "hungry" && Math.floor(this.t * 3) % 2 === 0) { // gulping mouth
-      const mx = f.facing === 1 ? x + 14 : x + (w - 1 - 14);
-      this.ctx.fillStyle = "#e2571c"; this.ctx.fillRect(mx, ey + 2, 1, 1);
+      this.ctx.fillStyle = "#e2571c"; this.ctx.fillRect(col(14), ey + 2, 1, 1);
     }
   }
 }
