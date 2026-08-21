@@ -4,8 +4,14 @@ export type TimeFormat = "12h" | "24h";
 
 export type FishMood = "content" | "hungry" | "bored" | "dirty" | "sad" | "sleepy";
 
+/** The structure the fish swims around. Every one carries the clock in its lower portion. */
+export type StructureId = "castle" | "reunionTower" | "eiffelTower" | "bigBen" | "parthenon" | "stonehenge" | "pineapple";
+
+/** Which fish lives in the bowl. Changing species starts a new fish. */
+export type SpeciesId = "goldfish" | "betta" | "endler" | "chiliRasbora" | "scarletBadis" | "peaPuffer" | "whiteCloud";
+
 export interface GameState {
-  schemaVersion: 1;
+  schemaVersion: 2;
   hunger: number; // 0-100, higher = fuller
   happiness: number;
   cleanliness: number;
@@ -14,4 +20,6 @@ export interface GameState {
   timeFormat: TimeFormat;
   fishName: string;
   createdAt: number;
+  structure: StructureId;
+  species: SpeciesId;
 }

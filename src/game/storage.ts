@@ -1,20 +1,21 @@
 import { STORAGE_KEY } from "./constants";
 import { applyDecay, clamp, defaultState } from "./state";
+import { DEFAULT_SPECIES, DEFAULT_STRUCTURE, isSpeciesId, isStructureId } from "./catalog";
 import type { GameState } from "./types";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
 }
 
-/** Validate + repair a parsed blob; unknown/corrupt → null. */
+/** Validate + repair a parsed blob; unknown/corrupt → null. v1 blobs migrate (goldfish + castle). */
 function coerce(raw: unknown, now: number): GameState | null {
-  if (!isRecord(raw) || raw.schemaVersion !== 1) return null;
+  if (!isRecord(raw) || (raw.schemaVersion !== 1 && raw.schemaVersion !== 2)) return null;
   const num = (v: unknown, fallback: number) => (typeof v === "number" && Number.isFinite(v) ? v : fallback);
   const d = defaultState(now);
   const la = isRecord(raw.lastActionAt) ? raw.lastActionAt : {};
   const ts = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     hunger: clamp(num(raw.hunger, d.hunger)),
     happiness: clamp(num(raw.happiness, d.happiness)),
     cleanliness: clamp(num(raw.cleanliness, d.cleanliness)),
@@ -23,8 +24,13 @@ function coerce(raw: unknown, now: number): GameState | null {
     timeFormat: raw.timeFormat === "24h" ? "24h" : "12h",
     fishName: typeof raw.fishName === "string" ? raw.fishName.trim().slice(0, 16) : "",
     createdAt: num(raw.createdAt, now),
+    structure: isStructureId(raw.structure) ? raw.structure : DEFAULT_STRUCTURE,
+    species: isSpeciesId(raw.species) ? raw.species : DEFAULT_SPECIES,
   };
 }
+
+/** Exposed for tests. */
+export const coerceState = coerce;
 
 /** Load and apply offline decay. Falls back to a fresh fish on missing/corrupt data. */
 export function loadState(now = Date.now()): GameState {

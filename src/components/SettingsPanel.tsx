@@ -2,16 +2,16 @@ import { useState } from "react";
 import { formatClock } from "../game/time";
 import type { TimeFormat } from "../game/types";
 
+/** Clock format, rename, reset. Rendered inside the tabbed SidePanel. */
 export function SettingsPanel({ timeFormat, now, onTimeFormat, onReset, onRename }: {
   timeFormat: TimeFormat; now: number; onTimeFormat: (f: TimeFormat) => void; onReset: () => void; onRename: () => void;
 }) {
   const [confirming, setConfirming] = useState(false);
   const clock = formatClock(new Date(now), timeFormat);
   return (
-    <section className="panel" aria-labelledby="settings-h">
-      <h2 id="settings-h" className="panel-title">Settings</h2>
+    <>
       <div className="row">
-        <span>Castle clock</span>
+        <span>Clock</span>
         <div className="seg" role="radiogroup" aria-label="Time format">
           {(["12h", "24h"] as TimeFormat[]).map((f) => (
             <button key={f} role="radio" aria-checked={timeFormat === f} className={`seg-btn ${timeFormat === f ? "on" : ""}`} onClick={() => onTimeFormat(f)}>{f}</button>
@@ -42,6 +42,6 @@ export function SettingsPanel({ timeFormat, now, onTimeFormat, onReset, onRename
           </>
         )}
       </div>
-    </section>
+    </>
   );
 }
