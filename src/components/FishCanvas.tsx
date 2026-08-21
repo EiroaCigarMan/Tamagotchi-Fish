@@ -37,7 +37,7 @@ export const FishCanvas = forwardRef<FishCanvasHandle, EngineInputs>(function Fi
 
   return (
     <div className="bowl-frame">
-      <canvas ref={canvasRef} width={W} height={H} className="bowl-canvas" aria-label="Goldfish bowl" role="img" />
+      <canvas ref={canvasRef} width={W} height={H} className="bowl-canvas" aria-label={`${inputs.species} bowl`} role="img" />
     </div>
   );
 });

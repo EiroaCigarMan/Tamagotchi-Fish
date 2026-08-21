@@ -1,6 +1,7 @@
-import { CASTLE, drawCastle } from "./castle";
-import { FISH_FRAMES, FISH_MOOD_PALETTE, drawSprite, spriteHeight, spriteWidth } from "./sprites";
-import type { FishMood, TimeFormat } from "../game/types";
+import { STRUCTURE_REGISTRY } from "./structures";
+import { SPECIES_SPRITES, drawSprite, moodPalette, spriteHeight, spriteWidth } from "./sprites";
+import { SPECIES_FLAVOR } from "../game/catalog";
+import type { FishMood, SpeciesId, StructureId, TimeFormat } from "../game/types";
 
 export const W = 160;
 export const H = 144;
@@ -19,6 +20,8 @@ interface Fish {
   bob: number;
   frameT: number;
   dashUntil: number;
+  /** Schooling: followers keep this offset from the leader (fish[0]). */
+  ox: number; oy: number;
 }
 interface Bubble { x: number; y: number; r: number; vy: number; wob: number }
 interface Pellet { x: number; y: number; vy: number; ttl: number }
@@ -29,6 +32,8 @@ export interface EngineInputs {
   cleanliness: number;
   happiness: number;
   timeFormat: TimeFormat;
+  structure: StructureId;
+  species: SpeciesId;
 }
 
 const SPEED: Record<FishMood, number> = { content: 14, hungry: 12, bored: 8, dirty: 9, sad: 5, sleepy: 7 };
@@ -57,8 +62,10 @@ export class FishEngine {
   private raf = 0;
   private last = 0;
   private t = 0; // seconds since start
-  private inputs: EngineInputs = { mood: "content", cleanliness: 100, happiness: 100, timeFormat: "12h" };
-  private fish: Fish;
+  private inputs: EngineInputs = { mood: "content", cleanliness: 100, happiness: 100, timeFormat: "12h", structure: "castle", species: "goldfish" };
+  /** fish[0] is the leader (runs the AI); the rest school behind it. */
+  private fishes: Fish[] = [];
+  private get fish(): Fish { return this.fishes[0]; }
   private bubbles: Bubble[] = [];
   private pellets: Pellet[] = [];
   private particles: Particle[] = [];
@@ -73,10 +80,7 @@ export class FishEngine {
     if (!ctx) throw new Error("2d context unavailable");
     ctx.imageSmoothingEnabled = false;
     this.ctx = ctx;
-    this.fish = {
-      x: 50, y: 70, vx: 0, vy: 0, tx: 100, ty: 60, facing: 1, layer: "front",
-      retargetIn: 2, bob: 0, frameT: 0, dashUntil: 0,
-    };
+    this.spawnSchool(this.inputs.species);
     const rnd = mulberry32(1337);
     for (let i = 0; i < 90; i++) {
       const y = BOWL.sandY + 1 + Math.floor(rnd() * (BOWL.cy + BOWL.r - BOWL.sandY - 3));
@@ -90,7 +94,27 @@ export class FishEngine {
     }
   }
 
-  setInputs(i: EngineInputs) { this.inputs = i; }
+  setInputs(i: EngineInputs) {
+    const speciesChanged = i.species !== this.inputs.species;
+    this.inputs = i;
+    if (speciesChanged) this.spawnSchool(i.species);
+  }
+
+  /** (Re)create the fish for a species — one leader plus followers if it schools. */
+  private spawnSchool(species: SpeciesId) {
+    const n = SPECIES_FLAVOR[species].school;
+    const mk = (ox: number, oy: number): Fish => ({
+      x: 50 + ox, y: 70 + oy, vx: 0, vy: 0, tx: 100, ty: 60, facing: 1, layer: "front",
+      retargetIn: 2, bob: rand(0, 6.28), frameT: rand(0, 2), dashUntil: 0, ox, oy,
+    });
+    this.fishes = [mk(0, 0)];
+    for (let i = 1; i < n; i++) {
+      const ang = (i / (n - 1)) * Math.PI * 2;
+      this.fishes.push(mk(Math.round(-6 - Math.cos(ang) * 7 - i * 2), Math.round(Math.sin(ang) * 6)));
+    }
+  }
+
+  private get sprite() { return SPECIES_SPRITES[this.inputs.species]; }
 
   start() {
     this.last = performance.now();
@@ -116,7 +140,7 @@ export class FishEngine {
     }
   }
   play() {
-    this.fish.dashUntil = this.t + 4.5;
+    for (const f of this.fishes) f.dashUntil = this.t + 4.5;
     this.fish.retargetIn = 0;
     for (let i = 0; i < 6; i++) this.spawnBubble(this.fish.x + rand(-4, 4), this.fish.y);
   }
@@ -148,16 +172,19 @@ export class FishEngine {
     }
     return [BOWL.cx, BOWL.cy];
   }
-  private overlapsCastle(): boolean {
-    const f = this.fish, fw = 16, fh = 10;
-    return f.x + fw / 2 > CASTLE.x - 6 && f.x - fw / 2 < CASTLE.x + CASTLE.w + 6 && f.y + fh / 2 > CASTLE.y - 8 && f.y - fh / 2 < CASTLE.y + CASTLE.h;
+  /** True if any fish in the school touches the structure's bounds (so the layer never pops mid-structure). */
+  private overlapsStructure(): boolean {
+    const b = STRUCTURE_REGISTRY[this.inputs.structure].bounds;
+    const fr = this.sprite.frames[0];
+    const fw = spriteWidth(fr), fh = spriteHeight(fr);
+    return this.fishes.some((f) => f.x + fw / 2 > b.x && f.x - fw / 2 < b.x + b.w && f.y + fh / 2 > b.y && f.y - fh / 2 < b.y + b.h);
   }
 
   private update(dt: number) {
     const f = this.fish;
     const mood = this.inputs.mood;
     const dashing = this.t < f.dashUntil;
-    const speed = dashing ? 34 : SPEED[mood];
+    const speed = (dashing ? 34 : SPEED[mood]) * SPECIES_FLAVOR[this.inputs.species].speed;
 
     // Hungry fish chases pellets.
     let target: [number, number] | null = null;
@@ -176,36 +203,45 @@ export class FishEngine {
       if (f.retargetIn <= 0 || arrived) {
         [f.tx, f.ty] = this.randomTarget();
         f.retargetIn = dashing ? rand(0.6, 1.2) : rand(2.5, 6);
-        // Decide layer only when clear of the castle so it never pops.
-        if (!this.overlapsCastle()) f.layer = Math.random() < 0.45 ? "behind" : "front";
+        // Decide layer only when the whole school is clear of the structure so it never pops.
+        if (!this.overlapsStructure()) for (const s of this.fishes) s.layer = Math.random() < 0.45 ? "behind" : "front";
       }
     }
-    // Steering
-    const dx = f.tx - f.x, dy = f.ty - f.y;
-    const dist = Math.hypot(dx, dy) || 1;
-    const ax = (dx / dist) * speed, ay = (dy / dist) * speed;
-    const ease = dashing ? 6 : 2.2;
-    f.vx += (ax - f.vx) * Math.min(1, ease * dt);
-    f.vy += (ay - f.vy) * Math.min(1, ease * dt);
-    if (mood === "sad" || mood === "sleepy") f.vy += 3 * dt; // gentle sink
-    let nx = f.x + f.vx * dt, ny = f.y + f.vy * dt;
-    if (!this.inWater(nx, ny, 8)) { // bounce back toward center
-      f.vx *= -0.5; f.vy *= -0.5;
-      nx = f.x + (BOWL.cx - f.x) * 0.02; ny = f.y + (BOWL.cy - f.y) * 0.02;
-      f.retargetIn = 0;
+    // Followers aim at their slot beside the leader (with a little wobble so the school breathes).
+    for (let i = 1; i < this.fishes.length; i++) {
+      const s = this.fishes[i];
+      s.tx = f.x + s.ox * (f.facing === 1 ? 1 : -1) + Math.sin(this.t * 1.3 + i) * 2;
+      s.ty = f.y + s.oy + Math.cos(this.t * 1.1 + i * 2) * 2;
     }
-    f.x = nx; f.y = ny;
-    if (Math.abs(f.vx) > 1.5) f.facing = f.vx > 0 ? 1 : -1;
-    f.bob += dt * (mood === "sad" ? 1.2 : 2.5);
-    f.frameT += dt * (dashing ? 14 : mood === "sad" ? 3 : 7);
+    // Steering (every fish)
+    for (const s of this.fishes) {
+      const dx = s.tx - s.x, dy = s.ty - s.y;
+      const dist = Math.hypot(dx, dy) || 1;
+      const sp = s === f ? speed : Math.min(speed * 1.4, speed * 0.5 + dist * 1.2);
+      const ax = (dx / dist) * sp, ay = (dy / dist) * sp;
+      const ease = dashing ? 6 : 2.2;
+      s.vx += (ax - s.vx) * Math.min(1, ease * dt);
+      s.vy += (ay - s.vy) * Math.min(1, ease * dt);
+      if (mood === "sad" || mood === "sleepy") s.vy += 3 * dt; // gentle sink
+      let nx = s.x + s.vx * dt, ny = s.y + s.vy * dt;
+      if (!this.inWater(nx, ny, 8)) { // bounce back toward center
+        s.vx *= -0.5; s.vy *= -0.5;
+        nx = s.x + (BOWL.cx - s.x) * 0.02; ny = s.y + (BOWL.cy - s.y) * 0.02;
+        s.retargetIn = 0;
+      }
+      s.x = nx; s.y = ny;
+      if (Math.abs(s.vx) > 1.5) s.facing = s.vx > 0 ? 1 : -1;
+      s.bob += dt * (mood === "sad" ? 1.2 : 2.5);
+      s.frameT += dt * (dashing ? 14 : mood === "sad" ? 3 : 7);
+    }
 
-    // Eat pellets
+    // Eat pellets (any fish in the school can eat)
     this.pellets = this.pellets.filter((p) => {
       p.y += p.vy * dt; p.ttl -= dt;
       p.vy = Math.max(6, p.vy - 4 * dt);
-      const eaten = Math.abs(p.x - f.x) < 7 && Math.abs(p.y - f.y) < 6;
-      if (eaten) this.spawnBubble(f.x + f.facing * 6, f.y - 2);
-      return !eaten && p.ttl > 0 && p.y < BOWL.sandY - 1;
+      const eater = this.fishes.find((s) => Math.abs(p.x - s.x) < 7 && Math.abs(p.y - s.y) < 6);
+      if (eater) this.spawnBubble(eater.x + eater.facing * 6, eater.y - 2);
+      return !eater && p.ttl > 0 && p.y < BOWL.sandY - 1;
     });
 
     // Bubbles
@@ -278,12 +314,12 @@ export class FishEngine {
     this.plant(45, BOWL.sandY, 22, "#2f8f4f", "#5cc47a", 0);
     this.plant(114, BOWL.sandY, 24, "#2a7a45", "#4fb56b", 1.3);
 
-    // fish behind castle
-    if (this.fish.layer === "behind") this.drawFish();
-    // castle + clock
-    drawCastle(ctx, new Date(), this.inputs.timeFormat);
+    // fish behind the structure
+    for (const s of this.fishes) if (s.layer === "behind") this.drawFish(s);
+    // structure + clock
+    STRUCTURE_REGISTRY[this.inputs.structure].draw(ctx, new Date(), this.inputs.timeFormat);
     // fish in front
-    if (this.fish.layer === "front") this.drawFish();
+    for (const s of this.fishes) if (s.layer === "front") this.drawFish(s);
 
     // pellets
     ctx.fillStyle = "#b8783a";
@@ -341,23 +377,25 @@ export class FishEngine {
     }
   }
 
-  private drawFish() {
-    const f = this.fish;
-    const n = FISH_FRAMES.length;
-    const frame = FISH_FRAMES[((Math.floor(f.frameT) % n) + n) % n];
+  private drawFish(f: Fish) {
+    const sp = this.sprite;
+    const n = sp.frames.length;
+    const frame = sp.frames[((Math.floor(f.frameT) % n) + n) % n];
     const w = spriteWidth(frame), h = spriteHeight(frame);
     const bob = Math.round(Math.sin(f.bob) * 1.5);
     const x = Math.round(f.x - w / 2), y = Math.round(f.y - h / 2) + bob;
-    drawSprite(this.ctx, frame, x, y, f.facing === -1, FISH_MOOD_PALETTE[this.inputs.mood]);
-    // mood details drawn over the sprite (eye = white at col 10, pupil at col 11 when facing right; row 4)
-    const col = (c: number) => (f.facing === 1 ? x + c : x + (w - 1 - c));
-    const ex = Math.min(col(10), col(11)), ey = y + 4;
     const mood = this.inputs.mood;
-    this.ctx.fillStyle = "#c9641a";
+    const pal = moodPalette(this.inputs.species, mood);
+    drawSprite(this.ctx, frame, x, y, f.facing === -1, pal);
+    // mood details drawn over the sprite at the species' eye / mouth pixels
+    const col = (c: number) => (f.facing === 1 ? x + c : x + (w - 1 - c));
+    const [ec, er] = sp.eye, [mc, mr] = sp.mouth;
+    const ex = Math.min(col(ec), col(ec + 1)), ey = y + er;
+    this.ctx.fillStyle = pal.d ?? frame.palette.d;
     if (mood === "sad" || mood === "bored") this.ctx.fillRect(ex, ey - 1, 2, 1); // droopy lid
     if (mood === "sleepy" && Math.floor(this.t * 0.8) % 3 === 0) this.ctx.fillRect(ex, ey, 2, 1); // blink
     if (mood === "hungry" && Math.floor(this.t * 3) % 2 === 0) { // gulping mouth
-      this.ctx.fillStyle = "#e2571c"; this.ctx.fillRect(col(14), ey + 2, 1, 1);
+      this.ctx.fillStyle = pal.m ?? frame.palette.m; this.ctx.fillRect(col(mc), y + mr + 1, 1, 1);
     }
   }
 }

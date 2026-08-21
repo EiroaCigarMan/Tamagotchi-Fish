@@ -18,3 +18,12 @@
 - **Layer switching (behind/in-front of castle) only when the fish is clear of the castle**, so it never pops through it.
 - **`act()` reports cooldown refusal synchronously** via a state ref (the plan's closure-in-updater pattern is unreliable under StrictMode).
 - Added `scripts/snapshot.ts` (headless PNG render via `@napi-rs/canvas`) and `bun test` unit tests — neither in the plan.
+
+## Added later: structures + species (2026-08)
+
+- **Structure is a registry, not a file.** `canvas/structures.ts` maps each `StructureId` to `{ bounds, draw }`; the castle moved under it unchanged. The clock panel (edge, panel, glow digits, AM/PM pip) was pulled out into `canvas/clock.ts` so every landmark draws the same panel and the time stays in the lower portion of the scene.
+- **Species are sprites + two numbers.** Visual frames live in `canvas/sprites.ts`; gameplay flavor (`speed`, `school`) in `game/catalog.ts`. Decay, actions and moods stay species-agnostic — a deliberate "light flavor" call, not a balance system.
+- **Mood tinting replaced the hardcoded orange mood palette.** Moods now mix each species' own colours toward a mood colour, so a blue betta stays blue when sad.
+- **Schools.** `FishEngine` keeps `fishes[]`; `fishes[0]` runs the existing AI and followers steer to an offset slot beside it. Layer switching waits until the *whole* school is clear of the structure.
+- **Schema v2.** `GameState` gained `structure` + `species`; v1 saves load as goldfish + castle. Changing species goes through `newFish()` — stats/name/age reset, structure and clock format carry over. Structure changes are pure cosmetics.
+- **One tabbed panel** (Care / Tank / Settings) replaced the two stacked Care + Settings panels so the pickers sit where Feed / Play / Clean already were.
