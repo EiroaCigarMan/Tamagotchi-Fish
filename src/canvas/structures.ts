@@ -11,6 +11,11 @@ export interface Structure {
   id: StructureId;
   /** Rectangle the fish treats as "the structure" for layer switching. */
   bounds: Box;
+  /**
+   * Open spaces inside the structure (an arch, a gap between stones) that the fish is
+   * invited to swim through. Drawn "behind" the structure so the edges frame it.
+   */
+  passages?: Box[];
   draw(ctx: CanvasRenderingContext2D, now: Date, fmt: TimeFormat): void;
 }
 
@@ -21,28 +26,43 @@ const clockBox = (y: number, x = CX - CLOCK_W / 2): Box => ({ x, y, w: CLOCK_W, 
 // ---------------------------------------------------------------- Reunion Tower (Dallas)
 const reunionTower: Structure = {
   id: "reunionTower",
-  bounds: { x: 58, y: 48, w: 44, h: 76 },
+  bounds: { x: 56, y: 42, w: 48, h: 82 },
   draw(ctx, now, fmt) {
-    const C = { concrete: "#b9b6b0", concreteD: "#7e7b76", concreteL: "#e2dfd8", ball: "#3b4a5c", ballD: "#26303d", led: "#ffd45a", ledDim: "#8a6c1e", base: "#8e8a84", glassBase: "#4a5a6e" };
-    // plaza base (clock lives here)
-    rect(ctx, 58, 104, 44, SAND_Y - 104, C.base);
-    rect(ctx, 58, 104, 44, 1, C.concreteL);
-    rect(ctx, 60, 118, 40, 4, C.glassBase);
-    for (let x = 62; x < 100; x += 4) rect(ctx, x, 119, 1, 2, C.concreteL);
-    // three concrete columns
-    for (const x of [75, 79, 83]) {
-      rect(ctx, x, 64, 2, 40, C.concrete);
-      rect(ctx, x + 1, 64, 1, 40, C.concreteD);
+    const C = {
+      shaft: "#4a4640", shaftL: "#6e6a62", shaftD: "#2c2a26", band: "#5c5850",
+      ball: "#1b2440", ballEdge: "#2c3a66", lamp: "#fff3c2", lampGold: "#ffd45a", lampDim: "#9a7a2a",
+      base: "#3a3f55", baseL: "#6a7290", win: "#ffe9a8", winDim: "#8a7a50", glass: "#2a3550",
+    };
+    // low hotel/convention base — the clock lives in its facade
+    rect(ctx, 56, 104, 48, SAND_Y - 104, C.base);
+    rect(ctx, 56, 104, 48, 1, C.baseL);
+    for (let x = 58; x < 102; x += 3) rect(ctx, x, 119, 2, 2, (x / 3) % 2 ? C.win : C.winDim); // lit windows
+    rect(ctx, 58, 122, 44, 2, C.glass);
+    // three slender columns, close together, with horizontal banding
+    const cols = [76, 79, 82];
+    const shaftTop = 56;
+    for (const x of cols) {
+      rect(ctx, x, shaftTop, 2, 104 - shaftTop, C.shaft);
+      rect(ctx, x, shaftTop, 1, 104 - shaftTop, C.shaftL);
+      for (let y = shaftTop + 3; y < 104; y += 4) rect(ctx, x, y, 2, 1, C.band);
     }
-    // the ball: dark sphere with a lattice of lit points
-    const bx = CX, by = 58, r = 9;
+    rect(ctx, cols[2] + 1, shaftTop, 1, 104 - shaftTop, C.shaftD);
+    // the ball: a dark sphere wrapped in a geodesic net of warm lamps
+    const bx = CX, by = 54, r = 11;
     disc(ctx, bx, by, r, C.ball);
-    disc(ctx, bx, by, r, C.ballD, (x, y) => x > bx + 3 || y > by + 5);
-    disc(ctx, bx, by, r, C.led, (x, y) => (x + 2 * y) % 4 === 0 && Math.hypot(x - bx, y - by) < r - 0.5);
-    disc(ctx, bx, by, r, C.ledDim, (x, y) => (x + 2 * y) % 4 === 2 && Math.hypot(x - bx, y - by) < r - 1.5);
-    rect(ctx, bx - 1, by - r - 2, 2, 2, C.concreteD); // antenna stub
-    const meridiem = drawClockPanel(ctx, clockBox(106), now, fmt);
-    drawMeridiemPip(ctx, bx, by - r - 5, meridiem, C.ballD);
+    disc(ctx, bx, by, r, C.ballEdge, (x, y) => Math.hypot(x - bx, y - by) > r - 1.2);
+    // lamp net: a dense triangular lattice (3px pitch, every other row staggered) like the real geodesic frame
+    const lattice = (x: number, y: number) => ((y - by) % 2 === 0 ? (x - bx + 300) % 3 === 0 : (x - bx + 301) % 3 === 0);
+    disc(ctx, bx, by, r, C.lamp, (x, y) => lattice(x, y) && Math.hypot(x - bx, y - by) < r - 0.5);
+    disc(ctx, bx, by, r, C.lampGold, (x, y) => lattice(x, y) && (x + y) % 2 === 1 && Math.hypot(x - bx, y - by) < r - 0.5);
+    disc(ctx, bx, by, r, C.lampDim, (x, y) => !lattice(x, y) && (x + y) % 2 === 0 && Math.hypot(x - bx, y - by) < r - 2);
+    // edge lamps so the silhouette sparkles
+    disc(ctx, bx, by, r, C.lampGold, (x, y) => { const d = Math.hypot(x - bx, y - by); return d > r - 1.2 && (x + y) % 2 === 0; });
+    // columns continue up into the lower part of the ball
+    for (const x of cols) rect(ctx, x, by + 5, 2, r - 5, C.shaftD);
+    rect(ctx, bx - 1, by - r - 3, 2, 3, C.shaftD); // mast
+    const meridiem = drawClockPanel(ctx, clockBox(106), now, fmt, C.baseL);
+    drawMeridiemPip(ctx, bx + r + 3, by - r, meridiem, "#1c1730");
   },
 };
 
@@ -50,6 +70,7 @@ const reunionTower: Structure = {
 const eiffelTower: Structure = {
   id: "eiffelTower",
   bounds: { x: 48, y: 40, w: 64, h: 84 },
+  passages: [{ x: 64, y: 108, w: 32, h: 14 }], // the open arch between the legs
   draw(ctx, now, fmt) {
     const C = { iron: "#6b4a2a", ironL: "#9a6f42", ironD: "#3f2a16", deck: "#8a6a3a" };
     const top = 44, bottom = SAND_Y;
@@ -173,7 +194,8 @@ const parthenon: Structure = {
 // ---------------------------------------------------------------- Stonehenge (Wiltshire)
 const stonehenge: Structure = {
   id: "stonehenge",
-  bounds: { x: 42, y: 80, w: 76, h: 44 },
+  bounds: { x: 40, y: 78, w: 80, h: 46 },
+  passages: [{ x: 65, y: 94, w: 30, h: 28 }], // between the two big uprights
   draw(ctx, now, fmt) {
     const C = { stone: "#8f8a7c", stoneL: "#b3ae9e", stoneD: "#5d594e", moss: "#5f7a45" };
     const upright = (x: number, top: number, w: number) => {
@@ -192,12 +214,11 @@ const stonehenge: Structure = {
     upright(113, 102, 5); upright(120, 104, 5); lintel(112, 100, 14, 3);
     // fallen stone
     rect(ctx, 104, 120, 10, 3, C.stoneD); rect(ctx, 104, 120, 10, 1, C.stone);
-    // central trilithon — the clock is carved into a flat altar stone between the uprights
-    upright(56, 90, 8); upright(96, 90, 8);
-    lintel(55, 84, 50, 7);
-    lintel(60, 98, 40, 14); // altar stone
-    const meridiem = drawClockPanel(ctx, clockBox(99), now, fmt, C.stoneD);
-    drawMeridiemPip(ctx, CX, 80, meridiem, "#1c1730");
+    // central trilithon — wide open underneath; the clock is carved into a deep lintel
+    upright(56, 92, 8); upright(96, 92, 8);
+    lintel(54, 78, 52, 15);
+    const meridiem = drawClockPanel(ctx, clockBox(80), now, fmt, C.stoneD);
+    drawMeridiemPip(ctx, CX, 74, meridiem, "#1c1730");
   },
 };
 

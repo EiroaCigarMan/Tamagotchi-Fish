@@ -73,6 +73,9 @@ export class FishEngine {
   private gravel: { x: number; y: number; c: string }[] = [];
   private dirtSpecks: { x: number; y: number; ph: number }[] = [];
   private cleanFlash = 0;
+  /** 1 = a painted structure pixel. Built per structure; what "overlaps the structure" really means. */
+  private mask = new Uint8Array(W * H);
+  private maskFor: StructureId | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     canvas.width = W; canvas.height = H;
@@ -98,6 +101,17 @@ export class FishEngine {
     const speciesChanged = i.species !== this.inputs.species;
     this.inputs = i;
     if (speciesChanged) this.spawnSchool(i.species);
+    if (this.maskFor !== i.structure) this.buildMask(i.structure);
+  }
+
+  /** Render the structure alone and keep its alpha as an occupancy mask (the next frame overwrites the canvas anyway). */
+  private buildMask(id: StructureId) {
+    const ctx = this.ctx;
+    ctx.clearRect(0, 0, W, H);
+    STRUCTURE_REGISTRY[id].draw(ctx, new Date(), this.inputs.timeFormat);
+    const data = ctx.getImageData(0, 0, W, H).data;
+    for (let i = 0; i < W * H; i++) this.mask[i] = data[i * 4 + 3] > 0 ? 1 : 0;
+    this.maskFor = id;
   }
 
   /** (Re)create the fish for a species — one leader plus followers if it schools. */
@@ -172,12 +186,17 @@ export class FishEngine {
     }
     return [BOWL.cx, BOWL.cy];
   }
-  /** True if any fish in the school touches the structure's bounds (so the layer never pops mid-structure). */
+  /** True if any fish in the school sits over a painted structure pixel (so a layer flip never pops). */
   private overlapsStructure(): boolean {
-    const b = STRUCTURE_REGISTRY[this.inputs.structure].bounds;
+    if (this.maskFor !== this.inputs.structure) this.buildMask(this.inputs.structure);
     const fr = this.sprite.frames[0];
     const fw = spriteWidth(fr), fh = spriteHeight(fr);
-    return this.fishes.some((f) => f.x + fw / 2 > b.x && f.x - fw / 2 < b.x + b.w && f.y + fh / 2 > b.y && f.y - fh / 2 < b.y + b.h);
+    return this.fishes.some((f) => {
+      const x0 = Math.max(0, Math.floor(f.x - fw / 2) - 1), x1 = Math.min(W - 1, Math.ceil(f.x + fw / 2) + 1);
+      const y0 = Math.max(0, Math.floor(f.y - fh / 2) - 2), y1 = Math.min(H - 1, Math.ceil(f.y + fh / 2) + 2);
+      for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (this.mask[y * W + x]) return true;
+      return false;
+    });
   }
 
   private update(dt: number) {
@@ -201,10 +220,25 @@ export class FishEngine {
       f.retargetIn -= dt;
       const arrived = Math.hypot(f.tx - f.x, f.ty - f.y) < 4;
       if (f.retargetIn <= 0 || arrived) {
-        [f.tx, f.ty] = this.randomTarget();
-        f.retargetIn = dashing ? rand(0.6, 1.2) : rand(2.5, 6);
-        // Decide layer only when the whole school is clear of the structure so it never pops.
-        if (!this.overlapsStructure()) for (const s of this.fishes) s.layer = Math.random() < 0.45 ? "behind" : "front";
+        const clear = !this.overlapsStructure();
+        const passages = STRUCTURE_REGISTRY[this.inputs.structure].passages;
+        const fr = this.sprite.frames[0];
+        const fw = spriteWidth(fr), fh = spriteHeight(fr);
+        // Open structures: about a third of the time, swim through an opening (always drawn behind
+        // the structure so its edges frame the fish). Only when the school is clear or already behind, so it never pops.
+        const allBehind = this.fishes.every((s) => s.layer === "behind");
+        const through = passages?.length && (clear || allBehind) && !dashing && Math.random() < 0.35
+          ? passages[Math.floor(Math.random() * passages.length)] : null;
+        if (through && through.w >= fw && through.h >= fh) {
+          f.tx = rand(through.x + fw / 2, through.x + through.w - fw / 2);
+          f.ty = rand(through.y + fh / 2, through.y + through.h - fh / 2);
+          f.retargetIn = rand(3, 6);
+          for (const s of this.fishes) s.layer = "behind";
+        } else {
+          [f.tx, f.ty] = this.randomTarget();
+          f.retargetIn = dashing ? rand(0.6, 1.2) : rand(2.5, 6);
+          if (clear) for (const s of this.fishes) s.layer = Math.random() < 0.45 ? "behind" : "front";
+        }
       }
     }
     // Followers aim at their slot beside the leader (with a little wobble so the school breathes).

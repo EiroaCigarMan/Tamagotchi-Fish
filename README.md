@@ -67,14 +67,15 @@ src/
 - **Decay** (per real hour): Full −6, Happy −4, Clean −2.5. Full → empty ≈ 16 h.
 - **Actions**: Feed +28 full · Play +24 happy · Clean +40 clean (with small side effects and 6/10/15 s cooldowns, enforced in state, not just the UI).
 - **Mood** is derived from stats, never stored: sad → dirty → hungry → bored → sleepy → content.
-- The fish picks random waypoints inside the water, chases food when you feed it, and switches between swimming **behind** and **in front of** the structure only when it's clear of it (so it never pops).
+- The fish picks random waypoints inside the water, chases food when you feed it, and switches between swimming **behind** and **in front of** the structure only when none of its pixels sit over a painted structure pixel (the engine keeps an occupancy mask per structure), so it never pops.
+- **Open structures have passages.** The Eiffel Tower's arch and the gap under Stonehenge's lintel are declared as `passages`; about a third of the time the fish (or the whole school) deliberately swims through one, drawn behind the structure so the edges frame it. A test renders each structure and checks the passages really are empty pixels.
 - **Species flavor** is light on purpose: a speed multiplier (Betta 0.75× … Endler 1.35×) and a school size (Chili Rasbora ×6, White Cloud ×5 — followers trail a leader that runs the normal AI). Decay, actions and moods are identical for every species; moods tint each species' own palette instead of recolouring it orange.
 - **Structures** are drawn procedurally and all stand on the sand with the same 36×12 clock panel in their lower half, so the time is always in the same place regardless of what's above it.
 
 ## Adding a structure or a fish
 
 1. Add the id to `StructureId` / `SpeciesId` in `src/game/types.ts` and an entry in `src/game/catalog.ts` (label, emoji, blurb; species also get `speed` + `school`).
-2. Structure: add a `Structure` to `src/canvas/structures.ts` — draw with `rect`/`disc`, call `drawClockPanel` for the clock (36×12, keep it below y≈110) and `drawMeridiemPip` for AM/PM, and set `bounds` (bottom must be the sand line, y = 124).
+2. Structure: add a `Structure` to `src/canvas/structures.ts` — draw with `rect`/`disc`, call `drawClockPanel` for the clock (36×12, keep it below y≈110) and `drawMeridiemPip` for AM/PM, and set `bounds` (bottom must be the sand line, y = 124). If it has an opening at least 16×10 px, list it in `passages` and the fish will swim through it.
 3. Fish: add a `SpeciesSprite` to `src/canvas/sprites.ts` — right-facing frames using the shared palette letters, plus the `eye` and `mouth` pixel positions used by the mood overlays.
 4. `bun test` checks the registries line up, sprites are rectangular, and structures fit the bowl. `bun run snapshot` shows you the result without a browser.
 

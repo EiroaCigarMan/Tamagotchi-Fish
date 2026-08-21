@@ -82,3 +82,20 @@ describe("storage", () => {
     expect(isStructureId("castle")).toBe(true);
   });
 });
+
+describe("passages", () => {
+  test("open structures declare passages inside their bounds, big enough for a goldfish", () => {
+    for (const id of ["eiffelTower", "stonehenge"] as const) {
+      const { bounds: b, passages } = STRUCTURE_REGISTRY[id];
+      expect(passages?.length).toBeGreaterThan(0);
+      for (const p of passages!) {
+        expect(p.x).toBeGreaterThanOrEqual(b.x);
+        expect(p.x + p.w).toBeLessThanOrEqual(b.x + b.w);
+        expect(p.y).toBeGreaterThanOrEqual(b.y);
+        expect(p.y + p.h).toBeLessThanOrEqual(b.y + b.h);
+        expect(p.w).toBeGreaterThanOrEqual(16);
+        expect(p.h).toBeGreaterThanOrEqual(10);
+      }
+    }
+  });
+});
